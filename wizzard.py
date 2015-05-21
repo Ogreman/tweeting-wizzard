@@ -20,6 +20,18 @@ class Config(object):
     def __init__(self):
         self.verbose = False
         self.debug = False
+        self.silent = False
+
+    @property
+    def silent(self):
+        return self._silent
+
+    @silent.setter
+    def silent(self, value):
+        if value:
+            click.echo = lambda m: None
+            click.secho = lambda m, **w: None
+        self._silent = value
 
 
 pass_config = click.make_pass_decorator(Config, ensure=True)
@@ -28,12 +40,14 @@ pass_config = click.make_pass_decorator(Config, ensure=True)
 @click.group()
 @click.option('--verbose', is_flag=True)
 @click.option('--debug', is_flag=True)
+@click.option('--silent', is_flag=True)
 @pass_config
-def cli(config, verbose, debug): 
+def cli(config, verbose, debug, silent): 
     if any(key is None for key in KEYS):
         raise click.ClickException('Key not set!')       
     config.verbose = verbose
     config.debug = debug
+    config.silent = silent
 
     if debug:
         click.secho(
@@ -74,17 +88,19 @@ def tweet(config, to_self, message):
 
 
 @cli.command()
+@click.option('-f', '--force', is_flag=True)
 @pass_config
-def delete(config):
+def delete(config, force):
     if config.verbose:
         click.echo("Getting last tweet...")
     try:
         tweeter = TwitterAPI()
-        click.secho(
-            tweeter.last_tweet.text.encode('utf-8'),
-            fg="yellow"
-        )
-        click.confirm("Delete?", abort=True)
+        if not force:
+            click.secho(
+                tweeter.last_tweet.text.encode('utf-8'),
+                fg="yellow"
+            )
+            click.confirm("Delete?", abort=True)
         del tweeter.last_tweet
     except tweepy.error.TweepError as e:
         if config.debug:
@@ -125,3 +141,4 @@ class TwitterAPI(object):
 
     def get_last_tweet(self):
         return self.api.user_timeline(count=1)[0]
+        
