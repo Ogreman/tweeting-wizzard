@@ -104,7 +104,7 @@ def delete(config, force):
         del tweeter.last_tweet
     except tweepy.error.TweepError as e:
         if config.debug:
-            click.secho(e.reason, fg="red")
+            click.secho(str(e), fg="red")
         click.secho("Failed!", fg="red")
     else:
         click.secho("Deleted.", fg="green")
@@ -141,4 +141,3 @@ class TwitterAPI(object):
 
     def get_last_tweet(self):
         return self.api.user_timeline(count=1)[0]
-        
