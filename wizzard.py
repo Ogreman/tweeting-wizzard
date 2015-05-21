@@ -112,12 +112,28 @@ def delete(config, force):
         click.echo("Done.")
 
 
+@cli.command()
+@pass_config
+def stream(config):
+    if config.verbose:
+        click.echo("Starting stream...")
+    try:
+        tweeter = TwitterAPI()
+        tweeter.stream()
+    except Exception as e:
+        if config.debug:
+            click.secho(str(e), fg="red")
+        click.secho("Failed!", fg="red")
+    if config.verbose:
+        click.echo("Done.")        
+
+
 class TwitterAPI(object):
     
     def __init__(self):
-        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-        auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-        self.api = tweepy.API(auth)
+        self.auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        self.auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
+        self.api = tweepy.API(self.auth)
  
     def tweet(self, message, to_self=False):
         if to_self:
@@ -141,3 +157,31 @@ class TwitterAPI(object):
 
     def get_last_tweet(self):
         return self.api.user_timeline(count=1)[0]
+
+    def stream(self):   
+        self.stream = tweepy.Stream(self.auth, ClickSechoListener())
+        self.stream.userstream()
+
+
+class ClickSechoListener(tweepy.streaming.StreamListener):
+
+    def on_status(self, status):
+        click.secho(
+            "{user_name} (@{user_handle}):"
+            .format(
+                user_name=status.user.name.encode('utf-8'),
+                user_handle=status.user.screen_name,
+            )
+        )
+        click.secho(
+            status.text.encode('utf-8'),
+            fg="yellow"
+        )
+        click.secho(
+            "http://twitter.com/{status.user.screen_name}/status/{status.id}\n"
+            .format(status=status),
+            fg="blue"
+        )
+
+    def on_error(self, status):
+        click.secho(status, fg="red")
