@@ -1,5 +1,6 @@
 # tweeting-wizzard
 
+
 Installation
 ------------
 
@@ -63,3 +64,6 @@ With virtualenvwrapper installed, it is recommended to add the following to the 
     $ workon wizzard-env
     $ echo $CONSUMER_KEY
     CONSUMER_KEY
+
+
+Made by @a_WIZZARD. Hence the name.
