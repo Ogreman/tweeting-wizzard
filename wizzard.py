@@ -15,6 +15,10 @@ ACCESS_TOKEN_SECRET = os.environ.get('ACCESS_SECRET', None)
 KEYS = (CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 
 
+TWEET_URL = "http://twitter.com/{status.user.screen_name}/status/{status.id}"
+
+
+
 class Config(object):
 
     def __init__(self):
@@ -43,8 +47,10 @@ pass_config = click.make_pass_decorator(Config, ensure=True)
 @click.option('--silent', is_flag=True)
 @pass_config
 def cli(config, verbose, debug, silent): 
+ 
     if any(key is None for key in KEYS):
-        raise click.ClickException('Key not set!')       
+        raise click.ClickException('Key not set!')      
+
     config.verbose = verbose
     config.debug = debug
     config.silent = silent
@@ -114,8 +120,9 @@ def delete(config, force):
 
 @cli.command()
 @click.option('--count', default=1)
+@click.option('--url', is_flag=True)
 @pass_config
-def last(config, count):
+def last(config, count, url):
     if config.verbose:
         click.echo("Getting last tweet(s)...")
     try:
@@ -123,11 +130,21 @@ def last(config, count):
         if count > 1:
             for tweet in tweeter.get_last_tweet(count):
                 click.secho(tweet.text.encode('utf-8'), fg="yellow")
+                if url:
+                    click.secho(
+                        TWEET_URL.format(status=tweet),
+                        fg="blue"
+                    )
         else:
             click.secho(
                 tweeter.last_tweet.text.encode('utf-8'),
                 fg="yellow"
             )
+            if url:
+                click.secho(
+                    TWEET_URL.format(status=tweeter.last_tweet),
+                    fg="blue"
+                )
     except tweepy.error.TweepError as e:
         if config.debug:
             click.secho(str(e), fg="red")
@@ -137,13 +154,15 @@ def last(config, count):
 
 
 @cli.command()
+@click.option('--handle/--no-handle', default=True)
+@click.option('--url/--no-url', default=True)
 @pass_config
-def stream(config):
+def stream(config, handle, url):
     if config.verbose:
         click.echo("Starting stream...")
     try:
         tweeter = TwitterAPI()
-        tweeter.stream()
+        tweeter.stream(handle, url)
     except Exception as e:
         if config.debug:
             click.secho(str(e), fg="red")
@@ -182,30 +201,42 @@ class TwitterAPI(object):
     def get_last_tweet(self, count=1):
         return self.api.user_timeline(count=count)
 
-    def stream(self):   
-        self.stream = tweepy.Stream(self.auth, ClickSechoListener())
+    def stream(self, handle=True, url=True):   
+        self.stream = tweepy.Stream(
+            self.auth, 
+            ClickSechoListener(
+                handle=handle, 
+                url=url
+            )
+        )
         self.stream.userstream()
 
 
 class ClickSechoListener(tweepy.streaming.StreamListener):
 
+    def __init__(self, handle, url):
+        self.handle = handle
+        self.url = url
+        super(ClickSechoListener, self).__init__()
+
     def on_status(self, status):
-        click.secho(
-            "{user_name} (@{user_handle}):"
-            .format(
-                user_name=status.user.name.encode('utf-8'),
-                user_handle=status.user.screen_name,
+        if self.handle:
+            click.secho(
+                "{user_name} (@{user_handle}):"
+                .format(
+                    user_name=status.user.name.encode('utf-8'),
+                    user_handle=status.user.screen_name,
+                )
             )
-        )
         click.secho(
             status.text.encode('utf-8'),
             fg="yellow"
         )
-        click.secho(
-            "http://twitter.com/{status.user.screen_name}/status/{status.id}\n"
-            .format(status=status),
-            fg="blue"
-        )
+        if self.url:
+            click.secho(
+                TWEET_URL.format(status=status) + "\n",
+                fg="blue"
+            )
 
     def on_error(self, status):
         click.secho(status, fg="red")
