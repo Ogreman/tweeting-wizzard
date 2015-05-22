@@ -113,6 +113,30 @@ def delete(config, force):
 
 
 @cli.command()
+@click.option('--count', default=1)
+@pass_config
+def last(config, count):
+    if config.verbose:
+        click.echo("Getting last tweet(s)...")
+    try:
+        tweeter = TwitterAPI()
+        if count > 1:
+            for tweet in tweeter.get_last_tweet(count):
+                click.secho(tweet.text.encode('utf-8'), fg="yellow")
+        else:
+            click.secho(
+                tweeter.last_tweet.text.encode('utf-8'),
+                fg="yellow"
+            )
+    except tweepy.error.TweepError as e:
+        if config.debug:
+            click.secho(str(e), fg="red")
+        click.secho("Failed!", fg="red")
+    if config.verbose:
+        click.echo("Done.")
+
+
+@cli.command()
 @pass_config
 def stream(config):
     if config.verbose:
@@ -147,7 +171,7 @@ class TwitterAPI(object):
     @property
     def last_tweet(self):
         if not hasattr(self, '_last_tweet'):
-            self._last_tweet = self.get_last_tweet()
+            self._last_tweet = self.get_last_tweet()[0]
         return self._last_tweet
 
     @last_tweet.deleter
@@ -155,8 +179,8 @@ class TwitterAPI(object):
         self.api.destroy_status(self.last_tweet.id)
         del self._last_tweet
 
-    def get_last_tweet(self):
-        return self.api.user_timeline(count=1)[0]
+    def get_last_tweet(self, count=1):
+        return self.api.user_timeline(count=count)
 
     def stream(self):   
         self.stream = tweepy.Stream(self.auth, ClickSechoListener())
